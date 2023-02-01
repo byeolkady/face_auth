@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="face-api.js"></script>
+    <script src="js/commons.js"></script>
+    <script src="js/faceDetectionControls.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+    <script src="js/bbt.js"></script>
+</head>
+
+<body>
+    <div>
+        <!-- 제목을 중앙으로-->
+        <div class="row side-by-side">
+            <div class="row">
+                <p><span
+                        style="background: linear-gradient(to right, #ffa7a3, #5673bd); padding: 0.43em 1em; font-size: 40px; border-radius: 3px; color: #ffffff;">얼굴
+                        유사도 비교</span></p>
+                <br>
+                <p><span
+                        style="border-radius: 15px 15px 15px 0; border: 3px solid #FFAD5B; padding: 0.5em 0.6em; color: #FF8000;">얼굴
+                        판별</span></p>
+                <div style="position: relative" class="margin">
+                    <video onloadedmetadata="onPlay(this)" id="inputVideo" autoplay muted playsinline></video>
+                    <canvas id="overlay">
+                </div>
+
+                <div style="position: relative" class="margin">
+                    <video onloadedmetadata="onPlay(this)" id="inputVideo" autoplay muted playsinline></video>
+                    <canvas id="overlay">
+                </div>
+                <button class="btn waves-effect waves-light" type="submit" id="saveImageBtn" name="action"
+                    onclick="dectect_name()">판별
+                </button>
+                <button class="btn waves-effect waves-light" type="submit" name="action"
+                    onclick="location.href='/register_id'"> 등록 화면
+                </button>
+                <!-- 버튼을 누르면 웹캠이 실행됨-->
+                <button id="btn" class="btn waves-effect waves-light" type="submit" name="action"
+                    onclick="play_webcam()">촬영 시작
+                </button>
+                <br>
+                <div>
+                    <br>
+                    <!-- 이름을 출력하는 텍스트 -->
+                    <label for="distance">판별:</label>
+                    <input disabled value="-" id="distance" type="text" class="bold">
+                </div>
+
+
+            </div>
+
+
+
+
+            <!-- 이미지 출력 -->
+
+
+            <!--접속하면 run()을 우선적으로 실행 -->
+
+
+
+
+
+            <script>
+
+                var compare_image_base64;
+                var name_list = [];
+                var image_list = [];
+                let descriptors = { desc1: null, desc2: null }
+                //let name_length
+                var face_index;
+                var best_distance = 0;
+                var name_length;
+                var distance;
+                //inputVideo의 동영상을 image로 저장
+
+                function saveImage() {
+                    var video = document.getElementById("inputVideo");
+                    var canvas = document.getElementById("overlay");
+                    //canvas convert to base64
+                    //video에서 이미지 캡처
+                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                    //canvas 이미지 안보여주기
+                    canvas.style.display = "none";
+
+                    var img = canvas.toDataURL("image/png");
+                    //img를 base64로 변환
+                    compare_image_base64 = img.replace(/^data:image\/(png|jpg);base64,/, "");
+
+
+                    //api에 json 형태로 데이터를 보냄
+                    $.ajax({
+                        async: false,
+                        url: 'http://10.0.1.192:15027/save_image_detect',
+                        type: 'POST',
+                        data: JSON.stringify({ image: compare_image_base64 }),
+                        contentType: 'application/json',
+                        success: function (response) {
+                            console.log(response);
+
+
+                        },
+                        error: function (error) {
+                            console.log(error);
+                        }
+                    });
+
+                }
+
+
+                async function dectect_name() {
+                    //만약 distance에 값이 있으면 초기화
+                    if (document.getElementById("distance").value != "-") {
+                        document.getElementById("distance").value = "-";
+                    }
+
+                    saveImage()
+
+                    var name_length = await extract_name_length();
+
+
+
+
+                    for (var i = 0; i < name_length; i++) {
+                        var new_distance = await compare_image(i);
+                        if (new_distance > best_distance) {
+                            best_distance = new_distance;
+                            face_index = i;
+                        }
+                    }
+                    console.log("test");
+                    console.log(best_distance);
+                    console.log(face_index);
+                    var name = await extract_name(face_index);
+                    console.log(name);
+                    //name을 id가 distance인 input에 출력
+                    document.getElementById("distance").value = name;
+
+
+
+                }
+
+
+                // //웹캠 실행
+                // function play_webcam() {
+                //     faceapi.loadFaceRecognitionModel()
+                //     const videoEl = $('#inputVideo').get(0)
+                //     navigator.getUserMedia(
+                //         { video: {} },
+                //         stream => videoEl.srcObject = stream,
+                //         err => console.error(err)
+                //     )
+                // }
+                //웹캠 실행
+                function play_webcam() {
+                    faceapi.loadFaceRecognitionModel()
+                    const videoEl = $('#inputVideo').get(0)
+                    navigator.getUserMedia(
+                        { video: {} },
+                        stream => videoEl.srcObject = stream,
+                        err => console.error(err)
+                    )
+                }
+
+                function onPlay(videoEl) {
+                    const canvasEl = $('#overlay').get(0)
+                    const ctx = canvasEl.getContext('2d')
+                    const { videoWidth, videoHeight } = videoEl
+                    canvasEl.width = videoWidth
+                    canvasEl.height = videoHeight
+                    setInterval(() => {
+                        ctx.drawImage(videoEl, 0, 0, videoWidth, videoHeight)
+                    }, 1000 / 30)
+                }
+
+
+
+                //api를 이용하여 기존에 저장되어있는 이미지와 비교
+                function extract_name_list(i) {
+
+                    $.ajax({
+                        url: 'http://10.0.1.192:15027/detect_face',
+                        type: 'POST',
+                        data: JSON.stringify({ data_type: "name" }),
+                        contentType: 'application/json',
+                        success: function (response) {
+                            console.log(response);
+                            //response의 data를 name_list에 저장
+                            name_list = response.data;
+                            return name_list[i], name_length;
+
+                        },
+                        error: function (error) {
+                            console.log(error);
+
+                        }
+
+                    });
+
+                    //compare_image_base64를 이용하여 compare_image에 이미지 출력
+                    //name_list 길이 파악
+                    name_length = name_list.length;
+                    return name_list[i], name_length;
+                }
+
+                async function extract_name(i) {
+
+                    $.ajax({
+                        url: 'http://10.0.1.192:15027/detect_face',
+                        type: 'POST',
+                        data: JSON.stringify({ data_type: "name" }),
+                        contentType: 'application/json',
+                        success: function (response) {
+                            console.log(response);
+                            //response의 data를 name_list에 저장
+                            name_list = response.data;
+                            return name_list[i];
+
+                        },
+                        error: function (error) {
+                            console.log(error);
+
+                        }
+
+                    });
+
+                    //compare_image_base64를 이용하여 compare_image에 이미지 출력
+
+                    return name_list[i];
+                }
+                async function extract_name_length() {
+
+                    $.ajax({
+                        async: false,
+                        url: 'http://10.0.1.192:15027/detect_face',
+                        type: 'POST',
+                        data: JSON.stringify({ data_type: "name" }),
+                        contentType: 'application/json',
+                        success: function (response) {
+                            console.log(response);
+                            //response의 data를 name_list에 저장
+                            name_list = response.data;
+
+                            // return name_list.length;
+                        },
+                        error: function (error) {
+                            console.log(error);
+
+                        }
+
+                    });
+
+
+                    //name_list 길이 
+                    return name_list.length;
+
+                }
+                async function compare_image(i) {
+                    //i 변수를 이용하여 name_list[i]의 이미지를 불러옴
+
+                    $.ajax({
+                        async: false,
+                        url: 'http://10.0.1.192:15027/detect_face',
+                        type: 'POST',
+                        data: JSON.stringify({ data_type: "image" }),
+                        contentType: 'application/json',
+                        success: function (response) {
+
+                            image_list = response.data;
+
+
+                        },
+                        error: function (error) {
+                            console.log(error);
+
+                        }
+
+
+                    });
+
+                    //image_list[0] to base64
+                    //var saved_image_base64 = image_list[i].replace(/^data:image\/(png|jpg);base64,/, "");
+                    var saved_image_base64 = image_list[i];
+                    //compare_image_base64를 이용하여 compare_image에 이미지 출력
+
+                    //HTMLImageElement 생성
+                    var saved_image = document.createElement("img");
+                    var compare_image = document.createElement("img");
+                    //HTMLImageElement에 이미지 저장
+                    saved_image.src = "data:image/png;base64," + saved_image_base64;
+                    compare_image.src = "data:image/png;base64," + compare_image_base64;
+
+
+
+                    // descriptors.desc1 = faceapi.computeFaceDescriptor(saved_image)
+                    // descriptors.desc2 = faceapi.computeFaceDescriptor(compare_image)
+                    // var distance = faceapi.euclideanDistance(descriptors.desc1, descriptors.desc2);
+
+                    var desc2 = await faceapi.computeFaceDescriptor(compare_image)
+                    var desc1 = await faceapi.computeFaceDescriptor(saved_image)
+
+                    var distance = await faceapi.euclideanDistance(desc1, desc2);
+
+                    return distance;
+
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            </script>
+
+
+
+
+</body>
+
+</html>

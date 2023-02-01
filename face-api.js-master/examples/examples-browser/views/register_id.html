@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="face-api.js"></script>
+    <script src="js/commons.js"></script>
+    <script src="js/faceDetectionControls.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+</head>
+
+<body>
+    <div>
+        <!-- 제목을 중앙으로-->
+        <div class="center-content page-container">
+            <div class="row side-by-side">
+                <div class="row">
+                    <p><span
+                            style="background: linear-gradient(to right, #ffa7a3, #5673bd); padding: 0.43em 1em; font-size: 40px; border-radius: 3px; color: #ffffff;">얼굴
+                            유사도 비교</span></p>
+                    <br>
+                    <p><span
+                            style="border-radius: 15px 15px 15px 0; border: 3px solid #FFAD5B; padding: 0.5em 0.6em; color: #FF8000;">얼굴
+                            등록</span></p>
+                    <div style="position: relative" class="margin">
+                        <video onloadedmetadata="onPlay(this)" id="inputVideo" autoplay muted playsinline></video>
+                        <canvas id="overlay">
+                    </div>
+                    <!-- 이름 입력-->
+                    <div class="center-content page-container">
+                        <div class="row side-by-side">
+                            <div class="row">
+                                <input id="name" type="text" class="validate">
+                                <label for="name">Name</label>
+                            </div>
+                        </div>
+
+                        <div class="row side-by-side">
+                            <div class="row">
+                                <!-- 버튼을 클릭하면 웹캡의 이미지를 저장-->
+                                <button class="btn waves-effect waves-light" type="submit" id="saveImageBtn"
+                                    name="action" onclick="saveImage()"> 등록
+                                </button>
+                                <button class="btn waves-effect waves-light" type="submit" name="action"
+                                    onclick="location.href='/detect_id'"> 로그인
+                                </button>
+                                <!-- 버튼을 누르면 웹캠이 실행됨-->
+                                <button id="btn" class="btn waves-effect waves-light" type="submit" name="action"
+                                    onclick="play_webcam()">촬영 시작
+                                </button>
+                            </div>
+                        </div>
+
+
+
+
+                    </div>
+
+
+                </div>
+
+
+
+
+            </div>
+
+
+
+
+            <!-- 이미지 출력 -->
+
+
+
+
+
+
+            <script>
+
+                //inputVideo의 동영상을 image로 저장
+                function saveImage() {
+                    var video = document.getElementById("inputVideo");
+                    var canvas = document.getElementById("overlay");
+                    //canvas convert to base64
+                    //video에서 이미지 캡처
+                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                    //canvas 이미지 안보여주기
+                    canvas.style.display = "none";
+
+                    var img = canvas.toDataURL("image/png");
+                    //img를 base64로 변환
+                    var img_2 = img.replace(/^data:image\/(png|jpg);base64,/, "");
+
+
+                    //name에 입력한 이름을 가져옴
+                    var name = document.getElementById("name").value;
+                    //name이 비어있으면 경고창 띄우고 함수 종료
+                    if (name == "") {
+                        alert("이름을 입력해주세요");
+                        return;
+                    }
+
+
+                    //api에 json 형태로 데이터를 보냄
+                    $.ajax({
+                        url: 'http://10.0.1.192:15027/save_image',
+                        type: 'POST',
+                        data: JSON.stringify({ image: img_2, name: name }),
+                        contentType: 'application/json',
+                        //성공 했을때 response를 변수로 저장
+                        success: function (response) {
+
+
+
+                        },
+                        error: function (error) {
+                            console.log(error);
+                        }
+                    });
+
+                    alert("등록되었습니다");
+
+                }
+
+
+
+
+
+                //webcam 실행
+                function play_webcam() {
+                    faceapi.loadFaceRecognitionModel()
+                    const videoEl = $('#inputVideo').get(0)
+                    navigator.getUserMedia(
+                        { video: {} },
+                        stream => videoEl.srcObject = stream,
+                        err => console.error(err)
+                    )
+                }
+
+
+
+                //이미지 판별
+                const threshold = 0.6
+                let descriptors = { desc1: null, desc2: null }
+                const distance = faceapi.utils.round(
+                    faceapi.euclideanDistance(descriptors.desc1, descriptors.desc2)
+                )
+
+                function getfilename() {
+                    img_path = "images/webcam.png";
+
+                    //img_path에 있는 이미지를 읽어서 img id에 넣어줌
+                    document.getElementById("img").src = img_path;
+
+
+
+
+
+
+                }
+
+
+
+
+
+
+
+            </script>
+
+
+
+
+</body>
+
+</html>

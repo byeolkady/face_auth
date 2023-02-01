@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="face-api.js"></script>
+  <script src="js/commons.js"></script>
+  <script src="js/bbt.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+  <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+</head>
+<body>
+  
+  <!-- 제목 -->
+
+
+
+  <div class="center-content page-container">
+    <div class="row side-by-side">
+      <div class="row">
+        <p><span style="background: linear-gradient(to right, #ffa7a3, #5673bd); padding: 0.43em 1em; font-size: 40px; border-radius: 3px; color: #ffffff;">얼굴 유사도 비교</span></p>
+        <br>
+        <p><span style="border-radius: 15px 15px 15px 0; border: 3px solid #FFAD5B; padding: 0.5em 0.6em; color: #FF8000;">아이스크림미디어 스마트연구소</span></p>
+      </div>
+
+
+    </div>
+    <div>
+      리스트를 통하여 생성되는 이미지 유사도는 자동으로 계산됩니다.
+    </div>
+    <div>
+      파일 업로드를 통하여 생성되는 이미지 유사도는 submit 버튼을 눌러야 계산됩니다.
+      </div>
+    <div>
+      <div class="progress" id="loader">
+        <div class="indeterminate"></div>
+      </div>
+      <div class="row side-by-side">
+        <div class="center-content">
+          <img id="face1" src="" class="margin"/>
+          <div id="selectList1"></div>
+        </div>
+
+        <div class="center-content">
+          <img id="face2" src="" class="margin"/>
+          <div id="selectList2"></div>
+        </div>
+      </div>
+
+      <br>
+
+      <br>
+      <div>
+        <input id="refImgUploadInput1" type="file" class="bold" onchange="fileupload()" accept=".jpg, .jpeg, .png">
+      </div>
+      
+      <div>
+        <input id="refImgUploadInput2" type="file" class="bold" onchange="fileupload()" accept=".jpg, .jpeg, .png">
+      </div>
+      <br>
+
+
+      <!-- 버튼을 누르면 refImgUploadInput1과 refImgUploadInput2의 이미지를 face1과 face2에 넣어줌-->
+      <div class="row">
+        <button id="btn" class="btn waves-effect waves-light" type="submit" name="action" onclick="calculateDistance()">Submit
+        </button>
+      </div>
+      <div class="row">
+        <label for="distance">판별:</label>
+        <input disabled value="-" id="distance" type="text" class="bold">
+      </div>
+
+  </div>
+  
+  <script>
+    const threshold = 0.5
+    let descriptors = { desc1: null, desc2: null }
+    
+    function updateResult() {
+      const distance = faceapi.utils.round(
+        
+        faceapi.euclideanDistance(descriptors.desc1, descriptors.desc2)
+      )
+
+      
+      let text = distance
+      let bgColor = '#ffffff'
+      if (distance > threshold) {
+        text = '불일치'
+        text += "("+distance+")"
+        bgColor = '#ce7575'
+      }
+      else {
+        text = '일치'
+        text += "("+distance+")"
+        bgColor = '#75ce75'
+      }
+      $('#distance').val(text)
+      $('#distance').css('background-color', bgColor)
+      
+
+    }
+
+    async function onSelectionChanged(which, uri) {
+      
+      const input = await faceapi.fetchImage(uri)
+      
+      const imgEl = $(`#face${which}`).get(0)
+ 
+      imgEl.src = input.src
+      console.log(input)
+      
+      
+      descriptors[`desc${which}`] = await faceapi.computeFaceDescriptor(input)
+
+      console.log("check")
+      console.log(descriptors[`desc${which}`])
+      
+    }
+
+    async function run() {
+      await  faceapi.loadFaceRecognitionModel()
+      $('#loader').hide() 
+      
+      await onSelectionChanged(1, $('#selectList1 select').val())
+      await onSelectionChanged(2, $('#selectList2 select').val())
+      updateResult()
+    }
+    
+
+    $(document).ready(function() {
+      //renderNavBar('#navbar', 'bbt_face_similarity')
+      renderFaceImageSelectList(
+        '#selectList1',
+        async (uri) => {
+          await onSelectionChanged(1, uri)
+          updateResult()
+        },
+        { className: 'sheldon', imageIdx: 1 }
+      )
+
+      renderFaceImageSelectList(
+        '#selectList2',
+        async (uri) => {
+          await onSelectionChanged(2, uri)
+          updateResult()
+        },
+        { className: 'howard', imageIdx: 1 }
+      )
+      run()
+    })
+
+    //submit 버튼을 누르면 face1과 face2의 descriptor를 구하고 거리를 구하는 함수
+    function calculateDistance(){
+
+      //face api를 이용하여 face1과 face2의 descriptor를 구함
+      faceapi.computeFaceDescriptor(document.getElementById("face1")).then(function(desc1){
+        descriptors.desc1 = desc1;
+      });
+      faceapi.computeFaceDescriptor(document.getElementById("face2")).then(function(desc2){
+        descriptors.desc2 = desc2;
+      });
+      //두 descriptor의 거리를 구함
+      updateResult();
+
+
+    }
+
+    //파일 업로드하면 onSelectionChanged를 실행하는 함수
+    function fileupload(){
+      //파일을 업로드하면 onSelectionChanged를 실행
+      var file1 = document.getElementById("refImgUploadInput1").files[0];
+      var file2 = document.getElementById("refImgUploadInput2").files[0];
+      var reader1 = new FileReader();
+      var reader2 = new FileReader();
+      reader1.onload = function(e){
+        document.getElementById("face1").src = e.target.result;
+        onSelectionChanged(1, e.target.result);
+      }
+      reader2.onload = function(e){
+        document.getElementById("face2").src = e.target.result;
+        onSelectionChanged(2, e.target.result);
+      }
+      reader1.readAsDataURL(file1);
+      reader2.readAsDataURL(file2);
+      onSelectionChanged(1, reader1);
+      onSelectionChanged(2, reader2);
+
+    }
+
+
+  </script>
+
+</body>
+</html>
